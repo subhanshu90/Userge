@@ -35,27 +35,27 @@ async def ins_(message: Message):
 @userge.on_cmd("rape$", about={'header': "You already got that! Ain't?"})
 async def rape_(message: Message):
     """ Dont Rape Too much -_-"""
-await check_and_send(message, choice(RAPE_STRINGS), parse_mode="html")
+    await check_and_send(message, choice(RAPE_STRINGS), parse_mode="html")
 
 @userge.on_cmd("pro$", about={'header': "You already got that! Ain't?"})
 async def pro_(message: Message):
     """ String for Pros only -_-"""
-await check_and_send(message, choice(PROX_STRINGS), parse_mode="html")
+    await check_and_send(message, choice(PROX_STRINGS), parse_mode="html")
 
 @userge.on_cmd("fuk$", about={'header': "You already got that! Ain't?"})
 async def chutiya_(message: Message):
     """ String for fhu only -_-"""
-await check_and_send(message, choice(FUKX_STRINGS), parse_mode="html")
+    await check_and_send(message, choice(FUKX_STRINGS), parse_mode="html")
 
 @userge.on_cmd("chu$", about={'header': "You already got that! Ain't?"})
 async def chutiya_(message: Message):
     """ String for Chu only -_-"""
-await check_and_send(message, choice(CHUX_STRINGS), parse_mode="html")
+    await check_and_send(message, choice(CHUX_STRINGS), parse_mode="html")
 			  			  
 @userge.on_cmd("thanos$", about={'header': "You already got that! Ain't?"})
 async def thanos_(message: Message):
     """ String for thanos only -_-"""
-await check_and_send(message, choice(THANOSX_STRINGS), parse_mode="html")
+    await check_and_send(message, choice(THANOSX_STRINGS), parse_mode="html")
 			  
 @userge.on_cmd("abusehard$", about={'header': "You already got that! Ain't?"})
 async def fuckedd_(message: Message):
@@ -77,7 +77,7 @@ await check_and_send(message, choice(ABUSEX_STRINGS), parse_mode="html")
 @userge.on_cmd("runs$", about={'header': "You already got that! Ain't?"})
 async def runner_(message: Message):
     """ Run, run, RUNNN! """
-await check_and_send(message, choice(RUNSX_STRINGS), parse_mode="html")
+await check_and_send(message, choice(RUNSXREACTS), parse_mode="html")
 
 @userge.on_cmd("noob$", about={'header': "You already got that! Ain't?"})
 async def metoo_(message: Message):
