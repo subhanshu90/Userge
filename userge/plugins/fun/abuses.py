@@ -56,24 +56,24 @@ async def chutiya_(message: Message):
 @userge.on_cmd("thanos$", about={'header': "You already got that! Ain't?"})
 async def thanos_(message: Message):
     """ String for thanos only -_-"""
-    await check_and_send(message, choice(THANOSX_STRINGS), parse_mode="html")
+    await check_and_send(message, choice(THANOS_STRINGS), parse_mode="html")
 			  
 @userge.on_cmd("abusehard$", about={'header': "You already got that! Ain't?"})
 async def fuckedd_(message: Message):
     """ Dont Use this Too much bsdk -_-"""
-    await check_and_send(message, choice(ABUSEHARDX_STRINGS), parse_mode="html")
+    await check_and_send(message, choice(ABUSEHARD_STRINGS), parse_mode="html")
 			  
 			  
 @userge.on_cmd("gey$", about={'header': "You already got that! Ain't?"})
 async def geys_(message: Message):
     """ Use only for gey ppl -_-"""
-    await check_and_send(message, choice(GEYX_STRINGS), parse_mode="html")
+    await check_and_send(message, choice(GEY_STRINGS), parse_mode="html")
 			  
 			  
 @userge.on_cmd("abuse$", about={'header': "You already got that! Ain't?"})
 async def abusing_(message: Message):
     """ Dont Abuse Too much bsdk -_-"""
-    await check_and_send(message, choice(ABUSEX_STRINGS), parse_mode="html")
+    await check_and_send(message, choice(ABUSE_STRINGS), parse_mode="html")
 
 @userge.on_cmd("runs$", about={'header': "You already got that! Ain't?"})
 async def runner_(message: Message):
