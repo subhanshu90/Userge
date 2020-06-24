@@ -1,3 +1,5 @@
+""" run shell or python command """
+
 # Copyright (C) 2020 by UsergeTeam@Github, < https://github.com/UsergeTeam >.
 #
 # This file is part of < https://github.com/UsergeTeam/Userge > project,
@@ -6,10 +8,8 @@
 #
 # All rights reserved.
 
-
 import io
 import sys
-import shlex
 import asyncio
 import traceback
 from getpass import getuser
@@ -24,8 +24,9 @@ from userge.utils import runcmd
 @userge.on_cmd("eval", about={
     'header': "run python code line | lines",
     'usage': "{tr}eval [code lines]",
-    'examples': "{tr}eval print('Userge')"})
+    'examples': "{tr}eval print('Userge')"}, allow_channels=False)
 async def eval_(message: Message):
+    """ run python code """
     cmd = await init_func(message)
     if cmd is None:
         return
@@ -34,9 +35,10 @@ async def eval_(message: Message):
     redirected_output = sys.stdout = io.StringIO()
     redirected_error = sys.stderr = io.StringIO()
     stdout, stderr, exc = None, None, None
+
     async def aexec(code):
-        exec("async def __aexec(userge, message):\n " + \
-                '\n '.join(line for line in code.split('\n')))
+        exec("async def __aexec(userge, message):\n "
+             + '\n '.join(line for line in code.split('\n')))
         return await locals()['__aexec'](userge, message)
     try:
         await aexec(cmd)
@@ -64,8 +66,9 @@ async def eval_(message: Message):
 @userge.on_cmd("exec", about={
     'header': "run shell commands",
     'usage': "{tr}exec [commands]",
-    'examples': "{tr}exec echo \"Userge\""})
+    'examples': "{tr}exec echo \"Userge\""}, allow_channels=False)
 async def exec_(message: Message):
+    """ run shell command """
     cmd = await init_func(message)
     if cmd is None:
         return
@@ -88,8 +91,9 @@ __Command:__\n`{cmd}`\n__PID:__\n`{pid}`\n__RETURN:__\n`{ret}`\n\n\
 @userge.on_cmd("term", about={
     'header': "run terminal commands",
     'usage': "{tr}term [commands]",
-    'examples': "{tr}term echo \"Userge\""})
+    'examples': "{tr}term echo \"Userge\""}, allow_channels=False)
 async def term_(message: Message):
+    """ run shell command (live update) """
     cmd = await init_func(message)
     if cmd is None:
         return
@@ -140,6 +144,7 @@ async def init_func(message: Message):
 
 
 class Term:
+    """ live update term class """
     def __init__(self, process: asyncio.subprocess.Process) -> None:
         self._process = process
         self._stdout = b''
@@ -188,8 +193,8 @@ class Term:
 
     @classmethod
     async def execute(cls, cmd: str) -> 'Term':
-        process = await asyncio.create_subprocess_exec(
-            *shlex.split(cmd), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        process = await asyncio.create_subprocess_shell(
+            cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         t_obj = cls(process)
-        asyncio.create_task(t_obj.worker())
+        asyncio.get_event_loop().create_task(t_obj.worker())
         return t_obj

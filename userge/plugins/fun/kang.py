@@ -1,3 +1,5 @@
+""" kang stickers """
+
 # Copyright (C) 2020 by UsergeTeam@Github, < https://github.com/UsergeTeam >.
 #
 # This file is part of < https://github.com/UsergeTeam/Userge > project,
@@ -5,7 +7,6 @@
 # Please see < https://github.com/uaudith/Userge/blob/master/LICENSE >
 #
 # All rights reserved.
-
 
 import os
 import math
@@ -24,10 +25,11 @@ from userge import userge, Message, Config, pool
     'header': "kangs stickers or creates new ones",
     'usage': "Reply {tr}kang [emoji('s)] [pack number] to a sticker or "
              "an image to kang it to your userbot pack.",
-    'examples': ["{tr}kang", "{tr}kang 🤔", "{tr}kang 2", "{tr}kang 🤔 2"]})
+    'examples': ["{tr}kang", "{tr}kang 🤔", "{tr}kang 2", "{tr}kang 🤔 2"]},
+    allow_channels=False)
 async def kang_(message: Message):
-    """kang"""
-    user = message.from_user
+    """ kang a sticker """
+    user = await userge.get_me()
     if not user.username:
         user.username = user.first_name or user.id
     replied = message.reply_to_message
@@ -77,6 +79,7 @@ async def kang_(message: Message):
             packname += "_anim"
             packnick += " (Animated)"
             cmd = '/newanimated'
+
         @pool.run_in_thread
         def get_response():
             response = urllib.request.urlopen(
@@ -84,8 +87,8 @@ async def kang_(message: Message):
             return response.read().decode("utf8").split('\n')
         htmlstr = await get_response()
         if ("  A <strong>Telegram</strong> user has created "
-            "the <strong>Sticker&nbsp;Set</strong>.") not in htmlstr:
-            async with userge.conversation('Stickers') as conv:
+                "the <strong>Sticker&nbsp;Set</strong>.") not in htmlstr:
+            async with userge.conversation('Stickers', limit=30) as conv:
                 try:
                     await conv.send_message('/addsticker')
                 except YouBlockedUser:
@@ -173,7 +176,7 @@ async def kang_(message: Message):
     'header': "get sticker pack info",
     'usage': "reply {tr}stkrinfo to any sticker"})
 async def sticker_pack_info_(message: Message):
-    """get sticker pack info"""
+    """ get sticker pack info """
     replied = message.reply_to_message
     if not replied:
         await message.edit("`I can't fetch info from nothing, can I ?!`")

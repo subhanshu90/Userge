@@ -8,56 +8,58 @@
 
 __all__ = ['Manager']
 
-from typing import Union, List, Dict
+import asyncio
+from typing import Union, List, Dict, Optional
 
 from ..types import Plugin, Filtr, Command, clear_db
 from .. import client as _client
 
 _FLT = Union[Filtr, Command]
 
+
 class Manager:
-    """manager for userge"""
+    """ manager for userge """
     def __init__(self) -> None:
         self.plugins: Dict[str, Plugin] = {}
 
     @property
     def commands(self) -> Dict[str, Command]:
-        """returns all commands"""
+        """ returns all commands """
         return {cmd.name: cmd for _, i in self.plugins.items() for cmd in i.commands}
 
     @property
     def filters(self) -> Dict[str, Filtr]:
-        """returns all filters"""
+        """ returns all filters """
         return {flt.name: flt for _, i in self.plugins.items() for flt in i.filters}
 
     @property
     def enabled_commands(self) -> Dict[str, Command]:
-        """returns all enabled commands"""
+        """ returns all enabled commands """
         return {cmd.name: cmd for _, cmd in self.commands.items() if cmd.is_enabled}
 
     @property
     def disabled_commands(self) -> List[Command]:
-        """returns all disabled commands"""
+        """ returns all disabled commands """
         return [cmd for _, cmd in self.commands.items() if cmd.is_disabled]
 
     @property
     def loaded_commands(self) -> List[Command]:
-        """returns all loaded commands"""
+        """ returns all loaded commands """
         return [cmd for _, cmd in self.commands.items() if cmd.is_loaded]
 
     @property
     def unloaded_commands(self) -> List[Command]:
-        """returns all unloaded commands"""
+        """ returns all unloaded commands """
         return [cmd for _, cmd in self.commands.items() if not cmd.is_loaded]
 
     @property
     def enabled_filters(self) -> List[Filtr]:
-        """returns all enabled filters"""
+        """ returns all enabled filters """
         return [flt for _, flt in self.filters.items() if flt.is_enabled]
 
     @property
     def disabled_filters(self) -> List[Filtr]:
-        """returns all disabled filters"""
+        """ returns all disabled filters """
         return [flt for _, flt in self.filters.items() if flt.is_disabled]
 
     @property
@@ -67,7 +69,7 @@ class Manager:
 
     @property
     def unloaded_filters(self) -> List[Filtr]:
-        """returns all unloaded filters"""
+        """ returns all unloaded filters """
         return [flt for _, flt in self.filters.items() if not flt.is_loaded]
 
     @property
@@ -77,12 +79,12 @@ class Manager:
 
     @property
     def disabled_plugins(self) -> List[Plugin]:
-        """returns all disabled plugins"""
+        """ returns all disabled plugins """
         return [plg for _, plg in self.plugins.items() if plg.is_disabled]
 
     @property
     def loaded_plugins(self) -> List[Plugin]:
-        """returns all loaded plugins"""
+        """ returns all loaded plugins """
         return [plg for _, plg in self.plugins.items() if plg.is_loaded]
 
     @property
@@ -90,128 +92,146 @@ class Manager:
         """returns all unloaded plugins"""
         return [plg for _, plg in self.plugins.items() if not plg.is_loaded]
 
-    def add_plugin(self, client: '_client.Userge',
-                   name: str, about: str = '') -> Plugin:
-        """add plugin to manager"""
+    async def init(self) -> None:
+        """ initialize all plugins """
+        await asyncio.gather(*[plg.init() for _, plg in self.plugins.items()])
+
+    def add_plugin(self, client: '_client.Userge', module_name: str) -> Plugin:
+        """ add plugin to manager """
+        name = module_name.split('.')[-1]
         if name in self.plugins:
             return self.plugins[name]
-        plg = Plugin(client, name, about)
+        parent = module_name.split('.')[-2]
+        plg = Plugin(client, name, parent)
         self.plugins[name] = plg
         return plg
 
+    def update_plugin(self, name: str, about: Optional[str]) -> None:
+        """ get plugin from name """
+        self.plugins[name].about = about.strip() if about else None
+
+    def get_plugins(self) -> Dict[str, List[str]]:
+        """ returns categorized plugins """
+        ret_dict: Dict[str, List[str]] = {}
+        for _, plg in self.enabled_plugins.items():
+            if plg.parent not in ret_dict:
+                ret_dict[plg.parent] = []
+            ret_dict[plg.parent].append(plg.name)
+        return ret_dict
+
     def clear_plugins(self) -> None:
-        """clear all plugins"""
+        """ clear all plugins """
         self.plugins.clear()
 
-    def enable_commands(self, commands: List[str]) -> List[str]:
-        """enable list of commands"""
+    async def enable_commands(self, commands: List[str]) -> List[str]:
+        """ enable list of commands """
         enabled: List[str] = []
         for cmd_name in list(set(commands).intersection(set(self.commands))):
-            ret = self.commands[cmd_name].enable()
+            ret = await self.commands[cmd_name].enable()
             if ret:
                 enabled.append(ret)
         return enabled
 
-    def disable_commands(self, commands: List[str]) -> List[str]:
-        """disable list of commands"""
+    async def disable_commands(self, commands: List[str]) -> List[str]:
+        """ disable list of commands """
         disabled: List[str] = []
         for cmd_name in list(set(commands).intersection(set(self.commands))):
-            ret = self.commands[cmd_name].disable()
+            ret = await self.commands[cmd_name].disable()
             if ret:
                 disabled.append(ret)
         return disabled
 
-    def load_commands(self, commands: List[str]) -> List[str]:
-        """load list of commands"""
+    async def load_commands(self, commands: List[str]) -> List[str]:
+        """ load list of commands """
         loaded: List[str] = []
         for cmd_name in list(set(commands).intersection(set(self.commands))):
-            ret = self.commands[cmd_name].load()
+            ret = await self.commands[cmd_name].load()
             if ret:
                 loaded.append(ret)
         return loaded
 
-    def unload_commands(self, commands: List[str]) -> List[str]:
-        """unload list of commands"""
+    async def unload_commands(self, commands: List[str]) -> List[str]:
+        """ unload list of commands """
         unloaded: List[str] = []
         for cmd_name in list(set(commands).intersection(set(self.commands))):
-            ret = self.commands[cmd_name].unload()
+            ret = await self.commands[cmd_name].unload()
             if ret:
                 unloaded.append(ret)
         return unloaded
 
-    def enable_filters(self, filters: List[str]) -> List[str]:
-        """enable list of filters"""
+    async def enable_filters(self, filters: List[str]) -> List[str]:
+        """ enable list of filters """
         enabled: List[str] = []
         for flt_name in list(set(filters).intersection(set(self.filters))):
-            ret = self.filters[flt_name].enable()
+            ret = await self.filters[flt_name].enable()
             if ret:
                 enabled.append(ret)
         return enabled
 
-    def disable_filters(self, filters: List[str]) -> List[str]:
-        """disable list of filters"""
+    async def disable_filters(self, filters: List[str]) -> List[str]:
+        """ disable list of filters """
         disabled: List[str] = []
         for flt_name in list(set(filters).intersection(set(self.filters))):
-            ret = self.filters[flt_name].disable()
+            ret = await self.filters[flt_name].disable()
             if ret:
                 disabled.append(ret)
         return disabled
 
-    def load_filters(self, filters: List[str]) -> List[str]:
-        """load list of filters"""
+    async def load_filters(self, filters: List[str]) -> List[str]:
+        """ load list of filters """
         loaded: List[str] = []
         for flt_name in list(set(filters).intersection(set(self.filters))):
-            ret = self.filters[flt_name].load()
+            ret = await self.filters[flt_name].load()
             if ret:
                 loaded.append(ret)
         return loaded
 
-    def unload_filters(self, filters: List[str]) -> List[str]:
-        """unload list of filters"""
+    async def unload_filters(self, filters: List[str]) -> List[str]:
+        """ unload list of filters """
         unloaded: List[str] = []
         for flt_name in list(set(filters).intersection(set(self.filters))):
-            ret = self.filters[flt_name].unload()
+            ret = await self.filters[flt_name].unload()
             if ret:
                 unloaded.append(ret)
         return unloaded
 
-    def enable_plugins(self, plugins: List[str]) -> Dict[str, List[str]]:
-        """enable list of plugins"""
+    async def enable_plugins(self, plugins: List[str]) -> Dict[str, List[str]]:
+        """ enable list of plugins """
         enabled: Dict[str, List[str]] = {}
         for plg_name in list(set(plugins).intersection(set(self.plugins))):
-            ret = self.plugins[plg_name].enable()
+            ret = await self.plugins[plg_name].enable()
             if ret:
                 enabled.update({plg_name: ret})
         return enabled
 
-    def disable_plugins(self, plugins: List[str]) -> Dict[str, List[str]]:
-        """disable list of plugins"""
+    async def disable_plugins(self, plugins: List[str]) -> Dict[str, List[str]]:
+        """ disable list of plugins """
         disabled: Dict[str, List[str]] = {}
         for plg_name in list(set(plugins).intersection(set(self.plugins))):
-            ret = self.plugins[plg_name].disable()
+            ret = await self.plugins[plg_name].disable()
             if ret:
                 disabled.update({plg_name: ret})
         return disabled
 
-    def load_plugins(self, plugins: List[str]) -> Dict[str, List[str]]:
-        """load list of plugins"""
+    async def load_plugins(self, plugins: List[str]) -> Dict[str, List[str]]:
+        """ load list of plugins """
         loaded: Dict[str, List[str]] = {}
         for plg_name in list(set(plugins).intersection(set(self.plugins))):
-            ret = self.plugins[plg_name].load()
+            ret = await self.plugins[plg_name].load()
             if ret:
                 loaded.update({plg_name: ret})
         return loaded
 
-    def unload_plugins(self, plugins: List[str]) -> Dict[str, List[str]]:
-        """unload list of plugins"""
+    async def unload_plugins(self, plugins: List[str]) -> Dict[str, List[str]]:
+        """ unload list of plugins """
         unloaded: Dict[str, List[str]] = {}
         for plg_name in list(set(plugins).intersection(set(self.plugins))):
-            ret = self.plugins[plg_name].unload()
+            ret = await self.plugins[plg_name].unload()
             if ret:
                 unloaded.update({plg_name: ret})
         return unloaded
 
     @staticmethod
-    def clear() -> bool:
-        """clear all filters in database"""
-        return bool(clear_db())
+    async def clear() -> bool:
+        """ clear all filters in database """
+        return bool(await clear_db())

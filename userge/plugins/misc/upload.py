@@ -1,3 +1,5 @@
+""" upload , rename and convert telegram files """
+
 # Copyright (C) 2020 by UsergeTeam@Github, < https://github.com/UsergeTeam >.
 #
 # This file is part of < https://github.com/UsergeTeam/Userge > project,
@@ -5,7 +7,6 @@
 # Please see < https://github.com/uaudith/Userge/blob/master/LICENSE >
 #
 # All rights reserved.
-
 
 import os
 import re
@@ -37,6 +38,7 @@ THUMB_PATH = Config.DOWN_PATH + "thumb_image.jpg"
     'usage': "{tr}rename [flags] [new_name_with_extention] : reply to telegram media",
     'examples': "{tr}rename -d test.mp4"}, del_pre=True)
 async def rename_(message: Message):
+    """ rename telegram files """
     if not message.filtered_input_str:
         await message.err("new name not found!")
         return
@@ -69,6 +71,7 @@ async def rename_(message: Message):
     'header': "Convert telegram files",
     'usage': "reply {tr}convert to any media"})
 async def convert_(message: Message):
+    """ convert telegram files """
     await message.edit("Trying to Convert...")
     if not os.path.isdir(Config.DOWN_PATH):
         os.mkdir(Config.DOWN_PATH)
@@ -101,6 +104,7 @@ async def convert_(message: Message):
         "{tr}upload -d https://speed.hetzner.de/100MB.bin | test.bin",
         "{tr}upload downloads/test.mp4"]}, del_pre=True)
 async def uploadtotg(message: Message):
+    """ upload to telegram """
     flags = message.flags
     path_ = message.filtered_input_str
     if not path_:
@@ -143,10 +147,10 @@ async def uploadtotg(message: Message):
                     "**ETA** : `{}`"
                 progress_str = progress_str.format(
                     "trying to download",
-                    ''.join((Config.FINISHED_PROGRESS_STR \
-                        for i in range(math.floor(percentage / 5)))),
-                    ''.join((Config.UNFINISHED_PROGRESS_STR \
-                        for i in range(20 - math.floor(percentage / 5)))),
+                    ''.join((Config.FINISHED_PROGRESS_STR
+                             for i in range(math.floor(percentage / 5)))),
+                    ''.join((Config.UNFINISHED_PROGRESS_STR
+                             for i in range(20 - math.floor(percentage / 5)))),
                     round(percentage, 2),
                     url,
                     file_name,
@@ -181,11 +185,12 @@ async def uploadtotg(message: Message):
 async def explorer(path: Path, chatid, flags, del_path):
     if path.is_file():
         try:
-            await upload(path, chatid, flags, del_path)
+            if path.stat().st_size:
+                await upload(path, chatid, flags, del_path)
         except FloodWait as x:
             time.sleep(x.x)  # asyncio sleep ?
     elif path.is_dir():
-        for i in path.iterdir():
+        for i in sorted(path.iterdir()):
             await explorer(i, chatid, flags, del_path)
 
 
@@ -268,6 +273,7 @@ async def audio_upload(chat_id, path, del_path: bool):
     message: Message = await userge.send_message(
         chat_id, f"`Uploading {path.name} as audio ...`")
     strpath = str(path)
+    file_size = humanbytes(os.stat(strpath).st_size)
     start_t = datetime.now()
     c_time = time.time()
     thumb = await get_thumb()
@@ -278,11 +284,14 @@ async def audio_upload(chat_id, path, del_path: bool):
         artist = metadata.get("artist")
     await userge.send_chat_action(chat_id, "upload_audio")
     try:
+        audio_caption = ""
+        audio_caption += f"{path.name} "
+        audio_caption += f"[ {file_size} ]"
         msg = await userge.send_audio(
             chat_id=chat_id,
             audio=strpath,
             thumb=thumb,
-            caption=path.name,
+            caption=audio_caption,
             title=title,
             performer=artist,
             duration=metadata.get("duration").seconds,
@@ -317,9 +326,8 @@ async def get_thumb(path: str = ''):
 
 
 async def remove_thumb(thumb: str) -> None:
-    if os.path.exists(thumb) and \
-            thumb != LOGO_PATH and \
-            thumb != THUMB_PATH:
+    if (thumb and os.path.exists(thumb)
+            and thumb != LOGO_PATH and thumb != THUMB_PATH):
         os.remove(thumb)
 
 

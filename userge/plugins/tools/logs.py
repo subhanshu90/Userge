@@ -6,12 +6,12 @@
 #
 # All rights reserved.
 
-
 import aiofiles
+
 from userge import userge, Message
 
 
-@userge.on_cmd("logs", about={'header': "check userge logs"})
+@userge.on_cmd("logs", about={'header': "check userge logs"}, allow_channels=False)
 async def check_logs(message: Message):
     """check logs"""
     await message.edit("`checking logs ...`")

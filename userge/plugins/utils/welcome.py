@@ -1,3 +1,5 @@
+""" auto welcome and left messages """
+
 # Copyright (C) 2020 by UsergeTeam@Github, < https://github.com/UsergeTeam >.
 #
 # This file is part of < https://github.com/UsergeTeam/Userge > project,
@@ -5,7 +7,6 @@
 # Please see < https://github.com/uaudith/Userge/blob/master/LICENSE >
 #
 # All rights reserved.
-
 
 import os
 import time
@@ -26,18 +27,15 @@ THUMB_PATH = Config.DOWN_PATH + "thumb_image.jpg"
 
 WELCOME_COLLECTION = get_collection("welcome")
 LEFT_COLLECTION = get_collection("left")
-
-WELCOME_LIST = WELCOME_COLLECTION.find({'on': True}, {'_id': 1})
-LEFT_LIST = LEFT_COLLECTION.find({'on': True}, {'_id': 1})
-
 WELCOME_CHATS = Filters.chat([])
 LEFT_CHATS = Filters.chat([])
 
-for i in WELCOME_LIST:
-    WELCOME_CHATS.add(i.get('_id'))
 
-for i in LEFT_LIST:
-    LEFT_CHATS.add(i.get('_id'))
+async def _init() -> None:
+    async for i in WELCOME_COLLECTION.find({'on': True}, {'_id': 1}):
+        WELCOME_CHATS.add(i.get('_id'))
+    async for i in LEFT_COLLECTION.find({'on': True}, {'_id': 1}):
+        LEFT_CHATS.add(i.get('_id'))
 
 
 @userge.on_cmd("setwelcome", about={
@@ -56,8 +54,10 @@ for i in LEFT_LIST:
         "{tr}setwelcome Hi {mention}, <b>Welcome</b> to {chat} chat\n"
         "or reply to supported media",
         "reply {tr}setwelcome to text message or supported media with text"],
-    'others': "**max media size limt** : 10MB !"})
+    'others': "**max media size limt** : 10MB !"},
+    allow_channels=False, allow_bots=False, allow_private=False)
 async def setwel(msg: Message):
+    """ set welcome message """
     await raw_set(msg, 'Welcome', WELCOME_COLLECTION, WELCOME_CHATS)
 
 
@@ -77,85 +77,106 @@ async def setwel(msg: Message):
         "{tr}setleft {flname}, Why you left :(\n"
         "or reply to supported media",
         "reply {tr}setleft to text message or supported media with text"],
-    'others': "**max media size limt** : 10MB !"})
+    'others': "**max media size limt** : 10MB !"},
+    allow_channels=False, allow_bots=False, allow_private=False)
 async def setleft(msg: Message):
+    """ set left message """
     await raw_set(msg, 'Left', LEFT_COLLECTION, LEFT_CHATS)
 
 
 @userge.on_cmd("nowelcome", about={
-    'header': "Disables and removes welcome message in the current chat"})
+    'header': "Disables and removes welcome message in the current chat"},
+    allow_channels=False, allow_bots=False, allow_private=False)
 async def nowel(msg: Message):
+    """ disable welcome message """
     await raw_no(msg, 'Welcome', WELCOME_COLLECTION, WELCOME_CHATS)
 
 
 @userge.on_cmd("noleft", about={
-    'header': "Disables and removes left message in the current chat"})
+    'header': "Disables and removes left message in the current chat"},
+    allow_channels=False, allow_bots=False, allow_private=False)
 async def noleft(msg: Message):
+    """ disable left message """
     await raw_no(msg, 'Left', LEFT_COLLECTION, LEFT_CHATS)
 
 
 @userge.on_cmd("dowelcome", about={
-    'header': "Turns on welcome message in the current chat"})
+    'header': "Turns on welcome message in the current chat"},
+    allow_channels=False, allow_bots=False, allow_private=False)
 async def dowel(msg: Message):
+    """ enable welcome message """
     await raw_do(msg, 'Welcome', WELCOME_COLLECTION, WELCOME_CHATS)
 
 
 @userge.on_cmd("doleft", about={
-    'header': "Turns on left message in the current chat :)"})
+    'header': "Turns on left message in the current chat :)"},
+    allow_channels=False, allow_bots=False, allow_private=False)
 async def doleft(msg: Message):
+    """ enable left message """
     await raw_do(msg, 'Left', LEFT_COLLECTION, LEFT_CHATS)
 
 
 @userge.on_cmd("delwelcome", about={
-    'header': "Delete welcome message in the current chat :)"})
+    'header': "Delete welcome message in the current chat :)"},
+    allow_channels=False, allow_bots=False, allow_private=False)
 async def delwel(msg: Message):
+    """ delete welcome message """
     await raw_del(msg, 'Welcome', WELCOME_COLLECTION, WELCOME_CHATS)
 
 
 @userge.on_cmd("delleft", about={
-    'header': "Delete left message in the current chat :)"})
+    'header': "Delete left message in the current chat :)"},
+    allow_channels=False, allow_bots=False, allow_private=False)
 async def delleft(msg: Message):
+    """ delete left messaage """
     await raw_del(msg, 'Left', LEFT_COLLECTION, LEFT_CHATS)
 
 
 @userge.on_cmd("lswelcome", about={
-    'header': "Shows the activated chats for welcome"})
+    'header': "Shows the activated chats for welcome"},
+    allow_channels=False, allow_bots=False, allow_private=False)
 async def lswel(msg: Message):
+    """ view all welcome messages """
     await raw_ls(msg, 'Welcome', WELCOME_COLLECTION)
 
 
 @userge.on_cmd("lsleft", about={
-    'header': "Shows the activated chats for left"})
+    'header': "Shows the activated chats for left"},
+    allow_channels=False, allow_bots=False, allow_private=False)
 async def lsleft(msg: Message):
+    """ view all left messages """
     await raw_ls(msg, 'Left', LEFT_COLLECTION)
 
 
 @userge.on_cmd("vwelcome", about={
-    'header': "Shows welcome message in current chat"})
+    'header': "Shows welcome message in current chat"},
+    allow_channels=False, allow_bots=False, allow_private=False)
 async def viewwel(msg: Message):
+    """ view welcome in current chat """
     await raw_view(msg, 'Welcome', WELCOME_COLLECTION)
 
 
 @userge.on_cmd("vleft", about={
-    'header': "Shows left message in current chat"})
+    'header': "Shows left message in current chat"},
+    allow_channels=False, allow_bots=False, allow_private=False)
 async def viewleft(msg: Message):
+    """ view left in current chat """
     await raw_view(msg, 'Left', LEFT_COLLECTION)
 
 
 @userge.on_new_member(WELCOME_CHATS)
 async def saywel(msg: Message):
+    """ welcome message handler """
     await raw_say(msg, 'Welcome', WELCOME_COLLECTION)
 
 
 @userge.on_left_member(LEFT_CHATS)
 async def sayleft(msg: Message):
+    """ left message handler """
     await raw_say(msg, 'Left', LEFT_COLLECTION)
 
 
 async def raw_set(message: Message, name, collection, chats):
-    if message.chat.type in ["private", "bot", "channel"]:
-        await message.err(text=f'Are you high XO\nSet {name} in a group chat')
-        return
     replied = message.reply_to_message
     string = message.input_or_reply_str
     file_ = ''
@@ -212,15 +233,15 @@ async def raw_set(message: Message, name, collection, chats):
             file_name = os.path.basename(tmp_path)
             os.remove(tmp_path)
 
-        collection.update_one({'_id': message.chat.id},
-                              {"$set": {'data': string,
-                                        'media': media,
-                                        'type': file_type,
-                                        'name': file_name,
-                                        'fid': file_id,
-                                        'fref': file_ref,
-                                        'on': True}},
-                              upsert=True)
+        await collection.update_one({'_id': message.chat.id},
+                                    {"$set": {'data': string,
+                                              'media': media,
+                                              'type': file_type,
+                                              'name': file_name,
+                                              'fid': file_id,
+                                              'fref': file_ref,
+                                              'on': True}},
+                                    upsert=True)
         chats.add(message.chat.id)
         out = f"{name} __message has been set for the__\n`{message.chat.title}`"
     await message.edit(text=out, del_in=3)
@@ -228,7 +249,8 @@ async def raw_set(message: Message, name, collection, chats):
 
 async def raw_no(message: Message, name, collection, chats):
     out = f"`First Set {name} Message!`"
-    if collection.find_one_and_update({'_id': message.chat.id}, {"$set": {'on': False}}):
+    if await collection.find_one_and_update(
+            {'_id': message.chat.id}, {"$set": {'on': False}}):
         if message.chat.id in chats:
             chats.remove(message.chat.id)
         out = f"`{name} Disabled Successfully!`"
@@ -237,7 +259,8 @@ async def raw_no(message: Message, name, collection, chats):
 
 async def raw_do(message: Message, name, collection, chats):
     out = f'Please set the {name} message with `.set{name.lower()}`'
-    if collection.find_one_and_update({'_id': message.chat.id}, {"$set": {'on': True}}):
+    if await collection.find_one_and_update(
+            {'_id': message.chat.id}, {"$set": {'on': True}}):
         chats.add(message.chat.id)
         out = f'`I will {name} new members XD`'
     await message.edit(text=out, del_in=3)
@@ -245,7 +268,7 @@ async def raw_do(message: Message, name, collection, chats):
 
 async def raw_del(message: Message, name, collection, chats):
     out = f"`First Set {name} Message!`"
-    if collection.find_one_and_delete({'_id': message.chat.id}):
+    if await collection.find_one_and_delete({'_id': message.chat.id}):
         if message.chat.id in chats:
             chats.remove(message.chat.id)
         out = f"`{name} Removed Successfully!`"
@@ -254,7 +277,7 @@ async def raw_del(message: Message, name, collection, chats):
 
 async def raw_view(message: Message, name, collection):
     liststr = ""
-    found = collection.find_one(
+    found = await collection.find_one(
         {'_id': message.chat.id}, {'data': 1, 'type': 1, 'on': 1})
     if found:
         liststr += f"**{(await userge.get_chat(message.chat.id)).title}**\n"
@@ -269,7 +292,7 @@ async def raw_view(message: Message, name, collection):
 
 async def raw_ls(message: Message, name, collection):
     liststr = ""
-    for c_l in collection.find({}, {'media': 0}):
+    async for c_l in collection.find({}, {'media': 0}):
         liststr += f"**{(await userge.get_chat(c_l['_id'])).title}**\n"
         if 'type' in c_l and c_l['type']:
             liststr += f"`{c_l['type']}`\n"
@@ -285,7 +308,7 @@ async def raw_say(message: Message, name, collection):
         else message.left_chat_member
     user_dict = await userge.get_user_dict(user.id)
     user_dict.update({'chat': message.chat.title if message.chat.title else "this group"})
-    found = collection.find_one({'_id': message.chat.id}, {'media': 0, 'name': 0})
+    found = await collection.find_one({'_id': message.chat.id}, {'media': 0, 'name': 0})
     caption = found['data']
     file_type = found['type'] if 'type' in found else ''
     file_id = found['fid'] if 'fid' in found else ''
@@ -296,16 +319,16 @@ async def raw_say(message: Message, name, collection):
         try:
             await send_proper_type(message, caption, file_type, file_id, file_ref)
         except (FileIdInvalid, FileReferenceEmpty, BadRequest):
-            found = collection.find_one({'_id': message.chat.id}, {'media': 1, 'name': 1})
+            found = await collection.find_one({'_id': message.chat.id}, {'media': 1, 'name': 1})
             file_name = found['name']
             media = found['media']
             tmp_media_path = os.path.join(Config.DOWN_PATH, file_name)
             async with aiofiles.open(tmp_media_path, "wb") as media_file:
                 await media_file.write(base64.b64decode(media))
             file_id, file_ref = await send_proper_type(message, caption, file_type, tmp_media_path)
-            collection.update_one({'_id': message.chat.id},
-                                  {"$set": {'fid': file_id, 'fref': file_ref}},
-                                  upsert=True)
+            await collection.update_one({'_id': message.chat.id},
+                                        {"$set": {'fid': file_id, 'fref': file_ref}},
+                                        upsert=True)
             os.remove(tmp_media_path)
     else:
         await message.reply(caption, del_in=Config.WELCOME_DELETE_TIMEOUT)

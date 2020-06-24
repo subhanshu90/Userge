@@ -15,13 +15,17 @@ from dotenv import load_dotenv
 if os.path.isfile("config.env"):
     load_dotenv("config.env")
 
-async def genStrSession():
+
+async def genStrSession() -> None:
     async with Client(
             "Userge",
             api_id=int(os.environ.get("API_ID") or input("Enter Telegram APP ID: ")),
             api_hash=os.environ.get("API_HASH") or input("Enter Telegram API HASH: ")
     ) as userge:
-        print(f"\nHere Your String -> {userge.export_session_string()}")
+        print("\nprocessing...")
+        await userge.send_message(
+            "me", f"#USERGE #HU_STRING_SESSION\n\n```{userge.export_session_string()}```")
+        print("Done !, session string has been sent to saved messages!")
 
 if __name__ == "__main__":
     asyncio.get_event_loop().run_until_complete(genStrSession())

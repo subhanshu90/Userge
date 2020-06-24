@@ -27,16 +27,17 @@ from .. import client as _client
 _LOG = logging.getLogger(__name__)
 _LOG_STR = "<<<!  :::::  %s  :::::  !>>>"
 
+
 class Mods(RawClient):
-    """some mods for userge"""
+    """ some mods for userge """
     def __init__(self, client: '_client.Userge', **kwargs) -> None:
         super().__init__(**kwargs)
-        self._channel = self.getCLogger(__name__)
+        self._channel = self.getCLogger("CORE")
         Conv.init(client)
         nest_asyncio.apply()
 
     def getCLogger(self, name: str) -> CLogger:
-        """This returns new channel logger object"""
+        """ This returns new channel logger object """
         _LOG.debug(_LOG_STR, f"Creating CLogger => {name}")
         return CLogger(self, name)
 

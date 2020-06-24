@@ -1,3 +1,5 @@
+""" manage your gdrive """
+
 # Copyright (C) 2020 by UsergeTeam@Github, < https://github.com/UsergeTeam >.
 #
 # This file is part of < https://github.com/UsergeTeam/Userge > project,
@@ -5,7 +7,6 @@
 # Please see < https://github.com/uaudith/Userge/blob/master/LICENSE >
 #
 # All rights reserved.
-
 
 import os
 import io
@@ -15,18 +16,18 @@ import math
 import pickle
 import asyncio
 from json import dumps
+from functools import wraps
 from datetime import datetime
 from mimetypes import guess_type
-from functools import wraps
-from httplib2 import Http
-from urllib.parse import unquote_plus
+from urllib.parse import unquote_plus, quote
 
+from httplib2 import Http
 from pySmartDL import SmartDL
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
-from oauth2client.client import OAuth2WebServerFlow
-from oauth2client.client import HttpAccessTokenRefreshError, FlowExchangeError
+from oauth2client.client import (
+    OAuth2WebServerFlow, HttpAccessTokenRefreshError, FlowExchangeError)
 
 from userge import userge, Message, Config, get_collection, pool
 from userge.utils import progress, humanbytes, time_formatter
@@ -44,48 +45,60 @@ G_DRIVE_FILE_LINK = "📄 <a href='https://drive.google.com/open?id={}'>{}</a> _
 G_DRIVE_FOLDER_LINK = "📁 <a href='https://drive.google.com/drive/folders/{}'>{}</a> __(folder)__"
 
 _LOG = userge.getLogger(__name__)
-_GDRIVE_COLLECTION = get_collection("gdrive")
+_SAVED_SETTINGS = get_collection("CONFIGS")
 
 
-class _DBase:
-    """Database Class for GDrive"""
-    def __init__(self, id_: str) -> None:
-        global _CREDS
-        self._id = id_
-        _LOG.debug("Setting GDrive DBase...")
-        if not _CREDS:
-            result = _GDRIVE_COLLECTION.find_one({'_id': self._id}, {'creds': 1})
-            _CREDS = pickle.loads(result['creds']) if result else None
+async def _init() -> None:
+    global _CREDS
+    _LOG.debug("Setting GDrive DBase...")
+    result = await _SAVED_SETTINGS.find_one({'_id': 'GDRIVE'}, {'creds': 1})
+    _CREDS = pickle.loads(result['creds']) if result else None
+
+
+async def _set_creds(creds: object) -> str:
+    global _CREDS
+    _LOG.info("Setting Creds...")
+    _CREDS = creds
+    result = await _SAVED_SETTINGS.update_one(
+        {'_id': 'GDRIVE'}, {"$set": {'creds': pickle.dumps(creds)}}, upsert=True)
+    if result.upserted_id:
+        return "`Creds Added`"
+    return "`Creds Updated`"
+
+
+async def _clear_creds() -> str:
+    global _CREDS
+    _CREDS = None
+    _LOG.info("Clearing Creds...")
+    if await _SAVED_SETTINGS.find_one_and_delete({'_id': 'GDRIVE'}):
+        return "`Creds Cleared`"
+    return "`Creds Not Found`"
+
+
+async def _refresh_creds() -> None:
+    try:
+        _LOG.debug("Refreshing Creds...")
+        _CREDS.refresh(Http())
+    except HttpAccessTokenRefreshError as h_e:
+        _LOG.exception(h_e)
+        _LOG.info(await _clear_creds())
+
+
+def creds_dec(func):
+    """ decorator for check _CREDS """
+    @wraps(func)
+    async def wrapper(self):
         if _CREDS:
-            try:
-                _LOG.debug("Refreshing Creds...")
-                _CREDS.refresh(Http())
-            except HttpAccessTokenRefreshError as h_e:
-                _LOG.exception(h_e)
-                self._clear_creds()
-
-    def _set_creds(self, creds) -> str:
-        global _CREDS
-        _LOG.info("Setting Creds...")
-        _CREDS = creds
-        result = _GDRIVE_COLLECTION.update_one(
-            {'_id': self._id}, {"$set": {'creds': pickle.dumps(creds)}}, upsert=True)
-        if result.upserted_id:
-            return "`Creds Added`"
-        return "`Creds Updated`"
-
-    def _clear_creds(self) -> str:
-        global _CREDS
-        _CREDS = None
-        _LOG.info("Creds Cleared!")
-        if _GDRIVE_COLLECTION.find_one_and_delete({'_id': self._id}):
-            return "`Creds Cleared`"
-        return "`Creds Not Found`"
+            await _refresh_creds()
+            await func(self)
+        else:
+            await self._message.edit("Please run `.gsetup` first", del_in=5)
+    return wrapper
 
 
-class _GDrive(_DBase):
-    """GDrive Class For Search, Upload, Download, Copy, Move, Delete, EmptyTrash, ..."""
-    def __init__(self, id_: str) -> None:
+class _GDrive:
+    """ GDrive Class For Search, Upload, Download, Copy, Move, Delete, EmptyTrash, ... """
+    def __init__(self) -> None:
         self._parent_id = _PARENT_ID or Config.G_DRIVE_PARENT_ID
         self._completed = 0
         self._list = 1
@@ -93,8 +106,6 @@ class _GDrive(_DBase):
         self._output = None
         self._is_canceled = False
         self._is_finished = False
-        _LOG.debug("Setting GDrive...")
-        super().__init__(id_)
 
     def _cancel(self) -> None:
         self._is_canceled = True
@@ -164,6 +175,33 @@ class _GDrive(_DBase):
                                            supportsTeamDrives=True).execute()
         _LOG.info("Set Permission : %s for Google-Drive File : %s", permissions, file_id)
 
+    def _get_file_path(self, file_id: str, file_name: str) -> str:
+        tmp_path = [file_name]
+        while True:
+            response = self._service.files().get(
+                fileId=file_id, fields='parents', supportsTeamDrives=True).execute()
+            if not response:
+                break
+            file_id = response['parents'][0]
+            response = self._service.files().get(
+                fileId=file_id, fields='name', supportsTeamDrives=True).execute()
+            tmp_path.append(response['name'])
+        return '/'.join(reversed(tmp_path[:-1]))
+
+    def _get_output(self, file_id: str, file_name: str, file_size: int = 0) -> str:
+        if file_size:
+            out = G_DRIVE_FILE_LINK.format(file_id, file_name, file_size)
+        else:
+            out = G_DRIVE_FOLDER_LINK.format(file_id, file_name)
+        if Config.G_DRIVE_INDEX_LINK:
+            link = os.path.join(
+                Config.G_DRIVE_INDEX_LINK.rstrip('/'), quote(
+                    self._get_file_path(file_id, file_name)))
+            if not file_size:
+                link += '/'
+            out += f"\n👥 __[Shareable Link]({link})__"
+        return out
+
     def _upload_file(self, file_path: str, parent_id: str) -> str:
         if self._is_canceled:
             raise ProcessCanceled
@@ -205,10 +243,10 @@ class _GDrive(_DBase):
                         "**Speed** : `{}/s`\n" + \
                         "**ETA** : `{}`"
                     self._progress = tmp.format(
-                        "".join((Config.FINISHED_PROGRESS_STR \
-                            for i in range(math.floor(percentage / 5)))),
-                        "".join((Config.UNFINISHED_PROGRESS_STR \
-                            for i in range(20 - math.floor(percentage / 5)))),
+                        "".join((Config.FINISHED_PROGRESS_STR
+                                 for i in range(math.floor(percentage / 5)))),
+                        "".join((Config.UNFINISHED_PROGRESS_STR
+                                 for i in range(20 - math.floor(percentage / 5)))),
                         round(percentage, 2),
                         file_name,
                         humanbytes(f_size),
@@ -228,7 +266,7 @@ class _GDrive(_DBase):
         file_size = humanbytes(int(drive_file.get('size', 0)))
         _LOG.info(
             "Created Google-Drive File => Name: %s ID: %s Size: %s", file_name, file_id, file_size)
-        return G_DRIVE_FILE_LINK.format(file_id, file_name, file_size)
+        return self._get_output(file_id, file_name, file_size)
 
     def _create_drive_dir(self, dir_name: str, parent_id: str) -> str:
         if self._is_canceled:
@@ -271,7 +309,7 @@ class _GDrive(_DBase):
                 folder_name = os.path.basename(os.path.abspath(file_name))
                 dir_id = self._create_drive_dir(folder_name, self._parent_id)
                 self._upload_dir(file_name, dir_id)
-                self._output = G_DRIVE_FOLDER_LINK.format(dir_id, folder_name)
+                self._output = self._get_output(dir_id, folder_name)
         except HttpError as h_e:
             _LOG.exception(h_e)
             self._output = h_e
@@ -307,10 +345,10 @@ class _GDrive(_DBase):
                         "**Speed** : `{}/s`\n" + \
                         "**ETA** : `{}`"
                     self._progress = tmp.format(
-                        "".join((Config.FINISHED_PROGRESS_STR \
-                            for i in range(math.floor(percentage / 5)))),
-                        "".join((Config.UNFINISHED_PROGRESS_STR \
-                            for i in range(20 - math.floor(percentage / 5)))),
+                        "".join((Config.FINISHED_PROGRESS_STR
+                                 for i in range(math.floor(percentage / 5)))),
+                        "".join((Config.UNFINISHED_PROGRESS_STR
+                                 for i in range(20 - math.floor(percentage / 5)))),
                         round(percentage, 2),
                         name,
                         humanbytes(f_size),
@@ -398,10 +436,10 @@ class _GDrive(_DBase):
             "```[{}{}]({}%)```\n" + \
             "**Completed** : `{}/{}`"
         self._progress = tmp.format(
-            "".join((Config.FINISHED_PROGRESS_STR \
-                for i in range(math.floor(percentage / 5)))),
-            "".join((Config.UNFINISHED_PROGRESS_STR \
-                for i in range(20 - math.floor(percentage / 5)))),
+            "".join((Config.FINISHED_PROGRESS_STR
+                     for i in range(math.floor(percentage / 5)))),
+            "".join((Config.UNFINISHED_PROGRESS_STR
+                     for i in range(20 - math.floor(percentage / 5)))),
             round(percentage, 2),
             self._completed,
             self._list)
@@ -443,10 +481,10 @@ class _GDrive(_DBase):
             file_name = drive_file['name']
             file_id = drive_file['id']
             if mime_type == G_DRIVE_DIR_MIME_TYPE:
-                self._output = G_DRIVE_FOLDER_LINK.format(file_id, file_name)
+                self._output = self._get_output(file_id, file_name)
             else:
                 file_size = humanbytes(int(drive_file.get('size', 0)))
-                self._output = G_DRIVE_FILE_LINK.format(file_id, file_name, file_size)
+                self._output = self._get_output(file_id, file_name, file_size)
         except HttpError as h_e:
             _LOG.exception(h_e)
             self._output = h_e
@@ -484,9 +522,9 @@ class _GDrive(_DBase):
         file_name = drive_file['name']
         file_id = drive_file['id']
         if mime_type == G_DRIVE_DIR_MIME_TYPE:
-            return G_DRIVE_FOLDER_LINK.format(file_id, file_name)
+            return self._get_output(file_id, file_name)
         file_size = humanbytes(int(drive_file.get('size', 0)))
-        return G_DRIVE_FILE_LINK.format(file_id, file_name, file_size)
+        return self._get_output(file_id, file_name, file_size)
 
     @pool.run_in_thread
     def _delete(self, file_id: str) -> None:
@@ -556,28 +594,18 @@ class _GDrive(_DBase):
         return removed_perms
 
 
-def creds_dec(func):
-    """decorator for check _CREDS"""
-    @wraps(func)
-    async def wrapper(self):
-        if _CREDS:
-            await func(self)
-        else:
-            await self._message.edit("Please run `.gsetup` first", del_in=5)
-    return wrapper
-
-
 class Worker(_GDrive):
-    """Worker Class for GDrive"""
+    """ Worker Class for GDrive """
     def __init__(self, message: Message) -> None:
         self._message = message
-        super().__init__(message.from_user.id)
+        super().__init__()
 
     def _get_file_id(self, filter_str: bool = False) -> tuple:
         link = self._message.input_str
         if filter_str:
             link = self._message.filtered_input_str
-        found = re.search(r'https://drive.google.com/[\w\?\./&=]+([-\w]{33}|0A[-\w]{17})', link)
+        found = re.search(
+            r'https://drive.google.com/[\w\?\./&=]+([-\w]{33}|(?<=/)0A[-\w]{17})', link)
         if found and 'folder' in link:
             out = (found.group(1), "folder")
         elif found:
@@ -587,7 +615,7 @@ class Worker(_GDrive):
         return out
 
     async def setup(self) -> None:
-        """Setup GDrive"""
+        """ Setup GDrive """
         global _AUTH_FLOW
         if _CREDS:
             await self._message.edit("`Already Setup!`", del_in=5)
@@ -603,7 +631,7 @@ class Worker(_GDrive):
                 text=reply_string, disable_web_page_preview=True)
 
     async def confirm_setup(self) -> None:
-        """Finalize GDrive setup"""
+        """ Finalize GDrive setup """
         global _AUTH_FLOW
         if _AUTH_FLOW is None:
             await self._message.edit("Please run `.gsetup` first", del_in=5)
@@ -615,16 +643,17 @@ class Worker(_GDrive):
             _LOG.exception(c_i)
             await self._message.err(c_i)
         else:
-            self._set_creds(cred)
             _AUTH_FLOW = None
-            await self._message.edit("`Saved GDrive Creds!`", del_in=3, log=True)
+            await asyncio.gather(
+                _set_creds(cred),
+                self._message.edit("`Saved GDrive Creds!`", del_in=3, log=__name__))
 
     async def clear(self) -> None:
-        """Clear Creds"""
-        await self._message.edit(self._clear_creds(), del_in=3, log=True)
+        """ Clear Creds """
+        await self._message.edit(await _clear_creds(), del_in=3, log=__name__)
 
     async def set_parent(self) -> None:
-        """Set Parent id"""
+        """ Set Parent id """
         global _PARENT_ID
         file_id, file_type = self._get_file_id()
         if file_type != "folder":
@@ -635,14 +664,14 @@ class Worker(_GDrive):
                 f"Parents set as `{file_id}` successfully", del_in=5)
 
     async def reset_parent(self) -> None:
-        """Reset parent id"""
+        """ Reset parent id """
         global _PARENT_ID
         _PARENT_ID = ""
         await self._message.edit("`Parents Reset successfully`", del_in=5)
 
     @creds_dec
     async def search(self) -> None:
-        """Search files in GDrive"""
+        """ Search files in GDrive """
         await self._message.edit("`Loading GDrive Search...`")
         try:
             out = await self._search(
@@ -657,7 +686,7 @@ class Worker(_GDrive):
 
     @creds_dec
     async def make_folder(self) -> None:
-        """Make folder in GDrive parent path"""
+        """ Make folder in GDrive parent path """
         if not self._parent_id:
             await self._message.edit("First set parent path by `.gset`", del_in=5)
             return
@@ -671,11 +700,11 @@ class Worker(_GDrive):
             await self._message.err(h_e._get_reason())
             return
         await self._message.edit(f"**Folder Created Successfully**\n\n{out}",
-                                 disable_web_page_preview=True, log=True)
+                                 disable_web_page_preview=True, log=__name__)
 
     @creds_dec
     async def list_folder(self) -> None:
-        """List files in GDrive folder or root"""
+        """ List files in GDrive folder or root """
         file_id, file_type = self._get_file_id(filter_str=True)
         if not file_id and not self._parent_id:
             await self._message.edit("First set parent path by `.gset`", del_in=5)
@@ -696,7 +725,7 @@ class Worker(_GDrive):
 
     @creds_dec
     async def upload(self) -> None:
-        """Upload from file/folder/link/tg file to GDrive"""
+        """ Upload from file/folder/link/tg file to GDrive """
         if not os.path.isdir(Config.DOWN_PATH):
             os.mkdir(Config.DOWN_PATH)
         replied = self._message.reply_to_message
@@ -753,10 +782,10 @@ class Worker(_GDrive):
                         "**ETA** : `{}`"
                     progress_str = progress_str.format(
                         "trying to download",
-                        ''.join((Config.FINISHED_PROGRESS_STR \
-                            for i in range(math.floor(percentage / 5)))),
-                        ''.join((Config.UNFINISHED_PROGRESS_STR \
-                            for i in range(20 - math.floor(percentage / 5)))),
+                        ''.join((Config.FINISHED_PROGRESS_STR
+                                 for i in range(math.floor(percentage / 5)))),
+                        ''.join((Config.UNFINISHED_PROGRESS_STR
+                                 for i in range(20 - math.floor(percentage / 5)))),
                         round(percentage, 2),
                         url,
                         file_name,
@@ -806,11 +835,11 @@ class Worker(_GDrive):
             out = self._output
         else:
             out = "`failed to upload.. check logs?`"
-        await self._message.edit(out, disable_web_page_preview=True, log=True)
+        await self._message.edit(out, disable_web_page_preview=True, log=__name__)
 
     @creds_dec
     async def download(self) -> None:
-        """Download file/folder from GDrive"""
+        """ Download file/folder from GDrive """
         await self._message.edit("`Loading GDrive Download...`")
         if not os.path.isdir(Config.DOWN_PATH):
             os.mkdir(Config.DOWN_PATH)
@@ -836,11 +865,11 @@ class Worker(_GDrive):
             out = self._output
         else:
             out = "`failed to download.. check logs?`"
-        await self._message.edit(out, disable_web_page_preview=True, log=True)
+        await self._message.edit(out, disable_web_page_preview=True, log=__name__)
 
     @creds_dec
     async def copy(self) -> None:
-        """Copy file/folder in GDrive"""
+        """ Copy file/folder in GDrive """
         if not self._parent_id:
             await self._message.edit("First set parent path by `.gset`", del_in=5)
             return
@@ -867,11 +896,11 @@ class Worker(_GDrive):
             out = self._output
         else:
             out = "`failed to copy.. check logs?`"
-        await self._message.edit(out, disable_web_page_preview=True, log=True)
+        await self._message.edit(out, disable_web_page_preview=True, log=__name__)
 
     @creds_dec
     async def move(self) -> None:
-        """Move file/folder in GDrive"""
+        """ Move file/folder in GDrive """
         if not self._parent_id:
             await self._message.edit("First set parent path by `.gset`", del_in=5)
             return
@@ -884,11 +913,11 @@ class Worker(_GDrive):
             await self._message.err(h_e._get_reason())
         else:
             await self._message.edit(
-                f"`{file_id}` **Moved Successfully**\n\n{link}", log=True)
+                f"`{file_id}` **Moved Successfully**\n\n{link}", log=__name__)
 
     @creds_dec
     async def delete(self) -> None:
-        """Delete file/folder in GDrive"""
+        """ Delete file/folder in GDrive """
         await self._message.edit("`Loading GDrive Delete...`")
         file_id, _ = self._get_file_id()
         try:
@@ -898,11 +927,11 @@ class Worker(_GDrive):
             await self._message.err(h_e._get_reason())
         else:
             await self._message.edit(
-                f"`{file_id}` **Deleted Successfully**", del_in=5, log=True)
+                f"`{file_id}` **Deleted Successfully**", del_in=5, log=__name__)
 
     @creds_dec
     async def empty(self) -> None:
-        """Empty GDrive Trash"""
+        """ Empty GDrive Trash """
         await self._message.edit("`Loading GDrive Empty Trash...`")
         try:
             await self._empty_trash()
@@ -911,11 +940,11 @@ class Worker(_GDrive):
             await self._message.err(h_e._get_reason())
         else:
             await self._message.edit(
-                "`Empty the Trash Successfully`", del_in=5, log=True)
+                "`Empty the Trash Successfully`", del_in=5, log=__name__)
 
     @creds_dec
     async def get(self) -> None:
-        """Get details for file/folder in GDrive"""
+        """ Get details for file/folder in GDrive """
         await self._message.edit("`Loading GDrive GetDetails...`")
         file_id, _ = self._get_file_id()
         try:
@@ -931,7 +960,7 @@ class Worker(_GDrive):
 
     @creds_dec
     async def get_perms(self) -> None:
-        """Get all Permissions of file/folder in GDrive"""
+        """ Get all Permissions of file/folder in GDrive """
         await self._message.edit("`Loading GDrive GetPermissions...`")
         file_id, _ = self._get_file_id()
         try:
@@ -947,7 +976,7 @@ class Worker(_GDrive):
 
     @creds_dec
     async def set_perms(self) -> None:
-        """Set Permissions to file/folder in GDrive"""
+        """ Set Permissions to file/folder in GDrive """
         await self._message.edit("`Loading GDrive SetPermissions...`")
         file_id, _ = self._get_file_id()
         try:
@@ -961,7 +990,7 @@ class Worker(_GDrive):
 
     @creds_dec
     async def del_perms(self) -> None:
-        """Remove all permisiions of file/folder in GDrive"""
+        """ Remove all permisiions of file/folder in GDrive """
         await self._message.edit("`Loading GDrive DelPermissions...`")
         file_id, _ = self._get_file_id()
         try:
@@ -976,9 +1005,10 @@ class Worker(_GDrive):
             caption=f"removed perm results for `{file_id}`")
 
 
-@userge.on_cmd("gsetup", about={'header': "Setup GDrive Creds"})
+@userge.on_cmd("gsetup", about={
+    'header': "Setup GDrive Creds"})
 async def gsetup_(message: Message):
-    """gsetup"""
+    """ setup creds """
     await Worker(message).setup()
 
 
@@ -986,13 +1016,14 @@ async def gsetup_(message: Message):
     'header': "Confirm GDrive Setup",
     'usage': "{tr}gconf [auth token]"})
 async def gconf_(message: Message):
-    """gconf"""
+    """ confirm creds """
     await Worker(message).confirm_setup()
 
 
-@userge.on_cmd("gclear", about={'header': "Clear GDrive Creds"})
+@userge.on_cmd("gclear", about={
+    'header': "Clear GDrive Creds"})
 async def gclear_(message: Message):
-    """gclear"""
+    """ clear creds """
     await Worker(message).clear()
 
 
@@ -1002,13 +1033,14 @@ async def gclear_(message: Message):
                    "this path is like working directory :)",
     'usage': "{tr}gset [drive folder link]"})
 async def gset_(message: Message):
-    """gset"""
+    """ setup path """
     await Worker(message).set_parent()
 
 
-@userge.on_cmd("greset", about={'header': "Reset parent id"})
+@userge.on_cmd("greset", about={
+    'header': "Reset parent id"})
 async def greset_(message: Message):
-    """greset"""
+    """ clear path """
     await Worker(message).reset_parent()
 
 
@@ -1019,7 +1051,7 @@ async def greset_(message: Message):
         '-f': "add to do a force search"},
     'usage': "{tr}gfind [search query]\n{tr}gfind -l10 [search query]"})
 async def gfind_(message: Message):
-    """gfind"""
+    """ search files """
     await Worker(message).search()
 
 
@@ -1030,7 +1062,7 @@ async def gfind_(message: Message):
              "{tr}gls [drive folder link] (default limit 20)\n"
              "{tr}gls -l10 [drive folder link] (add limit)"})
 async def gls_(message: Message):
-    """gls"""
+    """ list files """
     await Worker(message).list_folder()
 
 
@@ -1038,7 +1070,7 @@ async def gls_(message: Message):
     'header': "Make folders in GDrive parent",
     'usage': "{tr}gmake [folder name]"})
 async def gmake_(message: Message):
-    """gmake"""
+    """ make folder """
     await Worker(message).make_folder()
 
 
@@ -1052,7 +1084,7 @@ async def gmake_(message: Message):
         "{tr}gup test.bin : reply to tg file", "{tr}gup downloads/100MB.bin | test.bin",
         "{tr}gup https://speed.hetzner.de/100MB.bin | testing upload.bin"]})
 async def gup_(message: Message):
-    """gup"""
+    """ upload to gdrive """
     await Worker(message).upload()
 
 
@@ -1060,7 +1092,7 @@ async def gup_(message: Message):
     'header': "Download files from GDrive",
     'usage': "{tr}gdown [file_id | file/folder link]"})
 async def gdown_(message: Message):
-    """gdown"""
+    """ download from gdrive """
     await Worker(message).download()
 
 
@@ -1070,7 +1102,7 @@ async def gdown_(message: Message):
                    "use `{tr}gset` to set parent_id (root path).",
     'usage': "{tr}gcopy [file_id | file/folder link]"})
 async def gcopy_(message: Message):
-    """gcopy"""
+    """ copy files in gdrive """
     await Worker(message).copy()
 
 
@@ -1080,7 +1112,7 @@ async def gcopy_(message: Message):
                    "use `{tr}gset` to set parent_id (root path).",
     'usage': "{tr}gmove [file_id | file/folder link]"})
 async def gmove_(message: Message):
-    """gmove"""
+    """ move files in gdrive """
     await Worker(message).move()
 
 
@@ -1088,13 +1120,14 @@ async def gmove_(message: Message):
     'header': "Delete files in GDrive",
     'usage': "{tr}gdel [file_id | file/folder link]"})
 async def gdel_(message: Message):
-    """gdel"""
+    """ delete files in gdrive """
     await Worker(message).delete()
 
 
-@userge.on_cmd("gempty", about={'header': "Empty the Trash"})
+@userge.on_cmd("gempty", about={
+    'header': "Empty the Trash"})
 async def gempty_(message: Message):
-    """gempty"""
+    """ empty trash """
     await Worker(message).empty()
 
 
@@ -1102,7 +1135,7 @@ async def gempty_(message: Message):
     'header': "Get metadata from the given link in GDrive",
     'usage': "{tr}gget [file_id | file/folder link]"})
 async def gget_(message: Message):
-    """gget"""
+    """ get details """
     await Worker(message).get()
 
 
@@ -1110,7 +1143,7 @@ async def gget_(message: Message):
     'header': "Get permissions of file/folder in GDrive",
     'usage': "{tr}ggetperm [file_id | file/folder link]"})
 async def ggetperm_(message: Message):
-    """ggetperm"""
+    """ get permissions """
     await Worker(message).get_perms()
 
 
@@ -1118,7 +1151,7 @@ async def ggetperm_(message: Message):
     'header': "Set permissions to file/folder in GDrive",
     'usage': "{tr}gsetperm [file_id | file/folder link]"})
 async def gsetperm_(message: Message):
-    """gsetperm"""
+    """ set permissions """
     await Worker(message).set_perms()
 
 
@@ -1126,5 +1159,5 @@ async def gsetperm_(message: Message):
     'header': "Remove all permissions of file/folder in GDrive",
     'usage': "{tr}gdelperm [file_id | file/folder link]"})
 async def gdelperm_(message: Message):
-    """gdelperm"""
+    """ delete permissions """
     await Worker(message).del_perms()

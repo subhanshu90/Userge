@@ -18,8 +18,9 @@ from .. import client as _client
 _LOG = logging.getLogger(__name__)
 _LOG_STR = "<<<!  :::::  %s  :::::  !>>>"
 
+
 class CLogger:
-    """Channel logger for Userge"""
+    """ Channel logger for Userge """
     def __init__(self, client: '_client.Userge', name: str) -> None:
         self._client = client
         self._string = self._gen_string(name)
@@ -84,7 +85,7 @@ class CLogger:
             _LOG_STR, f"forwarding msg : {message_} to channel : {Config.LOG_CHANNEL_ID}")
         if Config.LOG_CHANNEL_ID and isinstance(message_, RawMessage):
             if message_.media:
-                asyncio.create_task(self.log("**Forwarding Message...**"))
+                asyncio.get_event_loop().create_task(self.log("**Forwarding Message...**"))
                 await self._client.forward_messages(chat_id=Config.LOG_CHANNEL_ID,
                                                     from_chat_id=message_.chat.id,
                                                     message_ids=message_.message_id,
