@@ -61,34 +61,34 @@ async def thanos_(message: Message):
 @userge.on_cmd("abusehard$", about={'header': "You already got that! Ain't?"})
 async def fuckedd_(message: Message):
     """ Dont Use this Too much bsdk -_-"""
-await check_and_send(message, choice(ABUSEHARDX_STRINGS), parse_mode="html")
+    await check_and_send(message, choice(ABUSEHARDX_STRINGS), parse_mode="html")
 			  
 			  
 @userge.on_cmd("gey$", about={'header': "You already got that! Ain't?"})
 async def geys_(message: Message):
     """ Use only for gey ppl -_-"""
-await check_and_send(message, choice(GEYX_STRINGS), parse_mode="html")
+    await check_and_send(message, choice(GEYX_STRINGS), parse_mode="html")
 			  
 			  
 @userge.on_cmd("abuse$", about={'header': "You already got that! Ain't?"})
 async def abusing_(message: Message):
     """ Dont Abuse Too much bsdk -_-"""
-await check_and_send(message, choice(ABUSEX_STRINGS), parse_mode="html")
+    await check_and_send(message, choice(ABUSEX_STRINGS), parse_mode="html")
 
 @userge.on_cmd("runs$", about={'header': "You already got that! Ain't?"})
 async def runner_(message: Message):
     """ Run, run, RUNNN! """
-await check_and_send(message, choice(RUNSXREACTS), parse_mode="html")
+    await check_and_send(message, choice(RUNSXREACTS), parse_mode="html")
 
 @userge.on_cmd("noob$", about={'header': "You already got that! Ain't?"})
 async def metoo_(message: Message):
     """ Haha yes """
-await check_and_send(message, choice(NOOBXSTR), parse_mode="html")
+    await check_and_send(message, choice(NOOBXSTR), parse_mode="html")
 			  
 @userge.on_cmd("rendi$", about={'header': "You already got that! Ain't?"})
 async def metoo_(message: Message):
     """ Haha yes """
-await check_and_send(message, choice(RENDISTR), parse_mode="html")
+    await check_and_send(message, choice(RENDISTR), parse_mode="html")
 
 RENDISTR = (
     "`I Know Uh ez Rendi Bhay Dont show Your Randi Pesa Here`",
