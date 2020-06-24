@@ -16,6 +16,7 @@ from random import choice, getrandbits, randint
 import wget
 import requests
 
+from userge import userge, Message
 
 async def check_and_send(message: Message, *args, **kwargs):
     replied = message.reply_to_message
