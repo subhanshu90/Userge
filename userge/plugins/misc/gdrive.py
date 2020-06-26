@@ -196,7 +196,7 @@ class _GDrive:
         if Config.G_DRIVE_INDEX_LINK:
             link = os.path.join(
                 Config.G_DRIVE_INDEX_LINK.rstrip('/'), quote(
-                    self._get_file_path(file_name)))
+                    self._get_file_path(file_id, file_name)))
             if not file_size:
                 link += '/'
             out += f"\n👥 __[Shareable Link]({link})__"
