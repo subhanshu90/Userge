@@ -162,8 +162,8 @@ RUNSXREACTS = (
     "Hey, look at them! They're running from the inevitable banhammer... Cute.",
     "What are you running after, a white rabbit?",
     "As The Doctor would say... RUN!",
-)
-    RAPE_STRINGS = (
+)	
+RAPE_STRINGS = (
      "Rape Done Drink The Cum",
      "EK baat yaad rkhio, Chut ka Chakkar matlab maut se takkar",
      "The user has been successfully raped",
