@@ -1,5 +1,3 @@
- By @krishna_singhal
-
 import os
 
 from pyrogram.errors.exceptions.bad_request_400 import YouBlockedUser
