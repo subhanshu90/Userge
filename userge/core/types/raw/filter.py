@@ -1,3 +1,5 @@
+# pylint: disable=missing-module-docstring
+#
 # Copyright (C) 2020 by UsergeTeam@Github, < https://github.com/UsergeTeam >.
 #
 # This file is part of < https://github.com/UsergeTeam/Userge > project,
@@ -6,7 +8,7 @@
 #
 # All rights reserved.
 
-__all__ = ['Filtr', 'clear_db']
+__all__ = ['Filter', 'clear_db']
 
 import asyncio
 from typing import List, Tuple, Callable, Any, Optional
@@ -14,7 +16,7 @@ from typing import List, Tuple, Callable, Any, Optional
 from pyrogram.client.handlers.handler import Handler
 
 from userge import logging, Config
-from .. import client as _client, get_collection
+from ... import client as _client, get_collection  # pylint: disable=unused-import
 
 _DISABLED_FILTERS = get_collection("DISABLED_FILTERS")
 _UNLOADED_FILTERS = get_collection("UNLOADED_FILTERS")
@@ -83,16 +85,21 @@ async def clear_db() -> bool:
 asyncio.get_event_loop().run_until_complete(_main())
 
 
-class Filtr:
+class Filter:
     """ filter class """
-    def __init__(self, client: '_client.Userge', group: int) -> None:
+    def __init__(self,
+                 client: '_client.Userge',
+                 group: int,
+                 allow_via_bot: bool) -> None:
         self._client = client
         self._group = group
+        self._allow_via_bot = allow_via_bot
         self._enabled = True
         self._loaded = False
         self.name: str
         self.about: Optional[str]
         self._handler: Handler
+        self.plugin_name: str
 
     def __repr__(self) -> str:
         return f"<filter - {self.name}>"
@@ -102,6 +109,11 @@ class Filtr:
         self._enabled, loaded = _init(self.name)
         if loaded:
             await self.load()
+
+    @property
+    def allow_via_bot(self) -> bool:
+        """ returns bot availability """
+        return self._allow_via_bot
 
     @property
     def is_enabled(self) -> bool:
@@ -121,7 +133,7 @@ class Filtr:
     def update(self, func: Callable[[Any], Any], handler: Handler) -> None:
         """ update filter """
         self.name = f"{func.__module__.split('.')[-1]}.{func.__name__}"
-        self.about = func.__doc__
+        self.about = func.__doc__.strip() if func.__doc__ else None
         self._handler = handler
         _LOG.debug(_LOG_STR, f"created filter -> {self.name}")
 
@@ -148,6 +160,9 @@ class Filtr:
         if self._loaded:
             return ''
         self._client.add_handler(self._handler, self._group)
+        # pylint: disable=protected-access
+        if self._allow_via_bot and self._client._bot is not None:
+            self._client._bot.add_handler(self._handler, self._group)
         self._loaded = True
         await _load(self.name)
         _LOG.debug(_LOG_STR, f"loaded filter -> {self.name}")
@@ -158,6 +173,9 @@ class Filtr:
         if not self._loaded:
             return ''
         self._client.remove_handler(self._handler, self._group)
+        # pylint: disable=protected-access
+        if self._allow_via_bot and self._client._bot is not None:
+            self._client._bot.remove_handler(self._handler, self._group)
         self._loaded = False
         await _unload(self.name)
         _LOG.debug(_LOG_STR, f"unloaded filter -> {self.name}")

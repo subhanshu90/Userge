@@ -38,10 +38,10 @@ async def ytinfo(message: Message):
     out = """
 **Title** >>
 __{title}__
-    
+
 **Uploader** >>
 __{uploader}__
-    
+
 {table}
     """.format_map(_exracted)
     if _exracted['thumb']:
@@ -116,7 +116,7 @@ async def ytDown(message: Message):
         _fpath = glob.glob(path.join(Config.DOWN_PATH, str(startTime), '*'))[0]
         await message.edit(f"**YTDL completed in {round(time() - startTime)} seconds**\n`{_fpath}`")
         if 't' in message.flags:
-            await upload(Path(_fpath), message.chat.id, message.flags)
+            await upload(message, Path(_fpath))
     else:
         await message.edit(str(retcode))
 

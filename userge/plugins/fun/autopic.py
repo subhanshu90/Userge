@@ -26,7 +26,7 @@ LOG = userge.getLogger(__name__)
 
 
 async def _init() -> None:
-    global UPDATE_PIC
+    global UPDATE_PIC  # pylint: disable=global-statement
     data = await SAVED_SETTINGS.find_one({'_id': 'UPDATE_PIC'})
     if data:
         UPDATE_PIC = data['on']
@@ -35,12 +35,13 @@ async def _init() -> None:
                 media_file_.write(base64.b64decode(data['media']))
 
 
-@userge.on_cmd("autopic", about={
-    'header': "set profile picture",
-    'usage': "{tr}autopic\n{tr}autopic [image path]\nset timeout using {tr}sapicto"},
-    allow_channels=False)
+@userge.on_cmd(
+    "autopic", about={
+        'header': "set profile picture",
+        'usage': "{tr}autopic\n{tr}autopic [image path]\nset timeout using {tr}sapicto"},
+    allow_channels=False, allow_via_bot=False)
 async def autopic(message: Message):
-    global UPDATE_PIC
+    global UPDATE_PIC  # pylint: disable=global-statement
     await message.edit('`processing...`')
     if UPDATE_PIC:
         if isinstance(UPDATE_PIC, asyncio.Task):
